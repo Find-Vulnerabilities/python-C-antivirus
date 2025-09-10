@@ -14,4 +14,4 @@ Please install Python 3.8 and or later and C++ and run the following command to 
 
 pip install psutil yara-python watchdog requests pywin32
 And　install yara in https://github.com/VirusTotal/yara/releases
-g++ -shared -o scan.dll scan.cpp
+And you need to compile C++ files:g++ -shared -o scan.dll scan.cpp
