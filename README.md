@@ -2,7 +2,7 @@
 SafetyWen Antivirus
 SafetyWen is a Python & C++-based Windows antivirus system with real-time monitoring, YARA scanning, memory analysis, file integrity checking, and sandbox isolation. This project is open source and welcomes reference, modification, and extension.
 
-#🔍 Features
+# 🔍 Features
 🧠 Process Monitoring: Detects and terminates malicious processes
 🧬 Memory Scanning: Analyzes abnormal process memory behavior
 📁 File Monitoring: Monitors file additions and modifications for immediate threat isolation
