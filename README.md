@@ -12,6 +12,7 @@ SafetyWen is a Python & C++-based Windows antivirus system with real-time monito
 ##⚙️ Installation
 Please install Python 3.8 and or later and C++ and run the following command to install the necessary packages:
 
-pip install psutil yara-python watchdog requests pywin32
-And　install yara in https://github.com/VirusTotal/yara/releases
-And you need to compile C++ files:g++ -shared -o scan.dll scan.cpp
+
+- `pip install psutil yara-python watchdog requests pywin32`
+- And　install yara in `https://github.com/VirusTotal/yara/releases`
+- And you need to compile C++ files:`g++ -shared -o scan.dll scan.cpp`
