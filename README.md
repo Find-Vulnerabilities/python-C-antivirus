@@ -10,7 +10,7 @@ SafetyWen is a Python & C++-based Windows antivirus system with real-time monito
 - 🧹 Junk Cleaner: Cleans system junk and temporary files
 - 🧰 GUI: Uses tkinter to provide a simple user interface
 
-##⚙️ Installation
+## ⚙️ Installation
 Please install Python 3.8 and or later and C++ and run the following command to install the necessary packages:
 
 
