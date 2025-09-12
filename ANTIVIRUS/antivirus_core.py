@@ -119,17 +119,10 @@ DELETION_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "del
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "antivirus.log")
 MAX_WORKERS = max(2, multiprocessing.cpu_count() - 1)
 
-# Whitelisted paths
-WHITELISTED_PATHS = [
-    r"C:\Windows\System32",
-    r"C:\Windows\SysWOW64",
-    r"C:\Program Files",
-    r"C:\Program Files (x86)",
-    r"C:\ProgramData",
-    r"C:\Windows\servicing",
-    r"C:\Program Files\Java",
+# Whitelisted SHA256 hashes (example, replace with real hashes)
+WHITELISTED_HASHES = [
+    "ca8c0a2a00f1d6f6da076d1d61fa706e82df57ed2b12ae3b3c36f4f73556b2ec",
 ]
-WHITELISTED_PATHS = [p.lower() for p in WHITELISTED_PATHS]
 # ================================================
 
 # Configure logging
@@ -986,7 +979,19 @@ rule Detect_Self_Modifying_Code_Improved
         
 
     def quarantine_file(self, file_path, reason):
-        """将文件移动到隔离区"""
+        """将文件移动到隔离区（优先用DLL）"""
+        if self.dll_loaded and scan_dll:
+            try:
+                c_file = file_path.encode('utf-8')
+                c_dir = self.quarantine_dir.encode('utf-8')
+                result = scan_dll.quarantine_file(c_file, c_dir)
+                if result:
+                    logger.info(f"Successfully quarantined file (DLL): {file_path}")
+                    # 记录隔离操作（可选，略）
+                    return True
+            except Exception as e:
+                logger.error(f"DLL quarantine error: {file_path} - {e}")
+        # fallback: 原有Python实现
         try:
             if not os.path.exists(file_path):
                 logger.warning(f"File not found for quarantine: {file_path}")
@@ -1024,6 +1029,42 @@ rule Detect_Self_Modifying_Code_Improved
             logger.error(f"Failed to quarantine file {file_path}: {e}")
             return False
 
+    def delete_file(self, file_path, reason=None):
+        """删除文件（优先用DLL）"""
+        if self.dll_loaded and scan_dll:
+            try:
+                c_file = file_path.encode('utf-8')
+                result = scan_dll.delete_file(c_file)
+                if result:
+                    logger.info(f"Successfully deleted file (DLL): {file_path}")
+                    # 记录删除操作（可选，略）
+                    return True
+            except Exception as e:
+                logger.error(f"DLL delete error: {file_path} - {e}")
+        # fallback: 原有Python实现
+        try:
+            if not os.path.exists(file_path):
+                logger.warning(f"File not found for deletion: {file_path}")
+                return False
+            
+            os.remove(file_path)
+            logger.info(f"Successfully deleted file: {file_path}")
+            
+            # 记录删除操作
+            if reason:
+                logger.info(f"Deletion reason: {reason}")
+            
+            # 更新记录
+            with self.deletion_lock:
+                self.deleted_files = [r for r in self.deleted_files 
+                                     if r.get("original_path") != file_path]
+                self.save_deletion_list()
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete file {file_path}: {e}")
+            return False
+
     def restore_quarantined_file(self, quarantine_path, original_path=None):
         """从隔离区恢复文件"""
         try:
@@ -1059,12 +1100,11 @@ rule Detect_Self_Modifying_Code_Improved
     
     
     def is_whitelisted(self, file_path):
-        """Check if file is in whitelisted path"""
+        """Check if file is in whitelisted SHA256 hash list"""
         try:
-            file_path = os.path.abspath(file_path).lower()
-            for whitelist_path in WHITELISTED_PATHS:
-                if file_path.startswith(whitelist_path.lower()):
-                    return True
+            file_hash = self.calculate_sha256(file_path)
+            if file_hash and file_hash.lower() in [h.lower() for h in WHITELISTED_HASHES]:
+                return True
             return False
         except Exception as e:
             logger.error(f"Error checking whitelist for {file_path}: {e}")
@@ -1831,7 +1871,19 @@ rule Detect_Self_Modifying_Code_Improved
         
 
     def quarantine_file(self, file_path, reason):
-        """将文件移动到隔离区"""
+        """将文件移动到隔离区（优先用DLL）"""
+        if self.dll_loaded and scan_dll:
+            try:
+                c_file = file_path.encode('utf-8')
+                c_dir = self.quarantine_dir.encode('utf-8')
+                result = scan_dll.quarantine_file(c_file, c_dir)
+                if result:
+                    logger.info(f"Successfully quarantined file (DLL): {file_path}")
+                    # 记录隔离操作（可选，略）
+                    return True
+            except Exception as e:
+                logger.error(f"DLL quarantine error: {file_path} - {e}")
+        # fallback: 原有Python实现
         try:
             if not os.path.exists(file_path):
                 logger.warning(f"File not found for quarantine: {file_path}")
@@ -1869,6 +1921,42 @@ rule Detect_Self_Modifying_Code_Improved
             logger.error(f"Failed to quarantine file {file_path}: {e}")
             return False
 
+    def delete_file(self, file_path, reason=None):
+        """删除文件（优先用DLL）"""
+        if self.dll_loaded and scan_dll:
+            try:
+                c_file = file_path.encode('utf-8')
+                result = scan_dll.delete_file(c_file)
+                if result:
+                    logger.info(f"Successfully deleted file (DLL): {file_path}")
+                    # 记录删除操作（可选，略）
+                    return True
+            except Exception as e:
+                logger.error(f"DLL delete error: {file_path} - {e}")
+        # fallback: 原有Python实现
+        try:
+            if not os.path.exists(file_path):
+                logger.warning(f"File not found for deletion: {file_path}")
+                return False
+            
+            os.remove(file_path)
+            logger.info(f"Successfully deleted file: {file_path}")
+            
+            # 记录删除操作
+            if reason:
+                logger.info(f"Deletion reason: {reason}")
+            
+            # 更新记录
+            with self.deletion_lock:
+                self.deleted_files = [r for r in self.deleted_files 
+                                     if r.get("original_path") != file_path]
+                self.save_deletion_list()
+            
+            return True
+        except Exception as e:
+            logger.error(f"Failed to delete file {file_path}: {e}")
+            return False
+
     def restore_quarantined_file(self, quarantine_path, original_path=None):
         """从隔离区恢复文件"""
         try:
@@ -1904,12 +1992,11 @@ rule Detect_Self_Modifying_Code_Improved
     
     
     def is_whitelisted(self, file_path):
-        """Check if file is in whitelisted path"""
+        """Check if file is in whitelisted SHA256 hash list"""
         try:
-            file_path = os.path.abspath(file_path).lower()
-            for whitelist_path in WHITELISTED_PATHS:
-                if file_path.startswith(whitelist_path.lower()):
-                    return True
+            file_hash = self.calculate_sha256(file_path)
+            if file_hash and file_hash.lower() in [h.lower() for h in WHITELISTED_HASHES]:
+                return True
             return False
         except Exception as e:
             logger.error(f"Error checking whitelist for {file_path}: {e}")
@@ -1951,7 +2038,7 @@ rule Detect_Self_Modifying_Code_Improved
             return "Scan stopped", 0
 
         if not os.path.exists(file_path):
-            return "File does not exist",  0
+            return "File does not exist", 0
 
         if self.is_whitelisted(file_path):
             return "Whitelisted file", 0
@@ -2017,57 +2104,3 @@ rule Detect_Self_Modifying_Code_Improved
             logger.error(f"Error calculating SHA256 hash: {file_path} - {e}")
             return None
 # ================================================
-
-class AntivirusEngine:
-    def __init__(self):
-        self.scan_count = 0
-        self.threats_found = 0
-        self.deleted_files = []  # Deletion records
-        self.deletion_lock = threading.Lock()
-        self.load_deletion_list()
-        self._stop_event = threading.Event()
-        self.monitor_dir = MONITOR_DIR
-        self.quarantine_dir = QUARANTINE_DIR
-        self._init_quarantine_dir()
-        self.file_integrity_records = {}  # {file_path: (size, mtime, hash)}
-        self.integrity_lock = threading.Lock()
-        self.api_key = None
-        self.yara_support = YARA_SUPPORT
-        self.yara_rule = None
-        self.dll_loaded = DLL_LOADED
-        if self.dll_loaded:
-            self._init_dll_yara()
-        if self.yara_support:
-            try:
-                self._load_yara_rule()
-            except Exception as e:
-                logger.error(f"Failed to load YARA rules: {e}")
-                self.yara_rule = None
-        # ...existing code...
-
-    def calculate_sha256(self, file_path):
-        """Calculate SHA256 hash of file (DLL優先)"""
-        if self.dll_loaded and scan_dll:
-            try:
-                c_path = file_path.encode('utf-8')
-                result = scan_dll.calculate_sha256(c_path)
-                if result:
-                    hash_str = ctypes.string_at(result).decode('utf-8')
-                    scan_dll.free_memory(result)
-                    return hash_str
-            except Exception as e:
-                logger.error(f"DLL SHA256 error: {file_path} - {e}")
-        # fallback
-        try:
-            with open(file_path, 'rb') as f:
-                file_hash = hashlib.sha256()
-                while True:
-                    chunk = f.read(8192)
-                    if not chunk:
-                        break
-                    file_hash.update(chunk)
-            return file_hash.hexdigest()
-        except Exception as e:
-            logger.error(f"Error calculating SHA256 hash: {file_path} - {e}")
-            return None
-# ...existing code...
