@@ -8,6 +8,7 @@
 #include <tlhelp32.h>
 #include <openssl/sha.h>
 #include <yara.h>
+#include <filesystem>
 
 // 全局变量
 YR_RULES* yara_rules = nullptr;
@@ -163,6 +164,53 @@ extern "C" __declspec(dllexport) char* scan_process_memory(int pid) {
     char* cstr = new char[result_str.length() + 1];
     std::strcpy(cstr, result_str.c_str());
     return cstr;
+}
+
+// 隔离文件函数
+extern "C" __declspec(dllexport) bool quarantine_file(const char* file_path, const char* quarantine_dir) {
+    try {
+        std::filesystem::path src(file_path);
+        if (!std::filesystem::exists(src)) {
+            return false;
+        }
+        std::filesystem::path qdir(quarantine_dir);
+        if (!std::filesystem::exists(qdir)) {
+            std::filesystem::create_directories(qdir);
+        }
+        // 生成唯一文件名
+        auto now = std::chrono::system_clock::now();
+        auto t = std::chrono::system_clock::to_time_t(now);
+        std::tm tm;
+#ifdef _WIN32
+        localtime_s(&tm, &t);
+#else
+        localtime_r(&t, &tm);
+#endif
+        char timestamp[32];
+        std::strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &tm);
+        std::string base = src.stem().string();
+        std::string ext = src.extension().string();
+        std::string quarantine_name = base + "_" + timestamp + ext;
+        std::filesystem::path dest = qdir / quarantine_name;
+        std::filesystem::rename(src, dest);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// 删除文件函数
+extern "C" __declspec(dllexport) bool delete_file(const char* file_path) {
+    try {
+        std::filesystem::path src(file_path);
+        if (!std::filesystem::exists(src)) {
+            return false;
+        }
+        std::filesystem::remove(src);
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 // 释放内存函数
