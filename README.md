@@ -15,5 +15,5 @@ Please install Python 3.8 and or later and C++ and run the following command to 
 
 
 - `pip install psutil yara-python watchdog requests pywin32` 
-- Install yara and sha256: `vcpkg install yara openssl:x64-windows`
+- Install yara and sha256: `vcpkg install yara`
 - You need to compile C++ files: `g++ -shared -o scan.dll scan.cpp` 
