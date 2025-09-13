@@ -233,3 +233,38 @@ extern "C" __declspec(dllexport) void cleanup() {
 extern "C" __declspec(dllexport) bool initialize() {
     return yr_initialize() == ERROR_SUCCESS;
 }
+
+// 阻止病毒執行程式功能：根據進程名稱終止進程
+extern "C" __declspec(dllexport) int block_process_by_name(const char* process_name) {
+    int killed_count = 0;
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+        return 0;
+    }
+
+    PROCESSENTRY32 pe;
+    pe.dwSize = sizeof(PROCESSENTRY32);
+
+    if (Process32First(hSnapshot, &pe)) {
+        do {
+#ifdef UNICODE
+            std::wstring ws(pe.szExeFile);
+            std::string exe_name(ws.begin(), ws.end());
+#else
+            std::string exe_name(pe.szExeFile);
+#endif
+            if (_stricmp(exe_name.c_str(), process_name) == 0) {
+                HANDLE hProcess = OpenProcess(PROCESS_TERMINATE, FALSE, pe.th32ProcessID);
+                if (hProcess) {
+                    if (TerminateProcess(hProcess, 1)) {
+                        ++killed_count;
+                    }
+                    CloseHandle(hProcess);
+                }
+            }
+        } while (Process32Next(hSnapshot, &pe));
+    }
+    CloseHandle(hSnapshot);
+    return killed_count;
+}
+
