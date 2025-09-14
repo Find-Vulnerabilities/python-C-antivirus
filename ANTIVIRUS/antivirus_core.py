@@ -883,8 +883,6 @@ rule Detect_Process_Injection_Improved
 }
 
 
-
-
 rule Detect_Self_Modifying_Code_Improved
 {
     meta:
@@ -1210,6 +1208,8 @@ rule Detect_Self_Modifying_Code_Improved
             return file_hash.hexdigest()
         except Exception as e:
             logger.error(f"Error calculating SHA256 hash: {file_path} - {e}")
+            return None
+# ================================================
             return None
 # ================================================
 
