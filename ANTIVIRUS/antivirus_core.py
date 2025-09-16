@@ -119,7 +119,7 @@ DELETION_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "del
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "antivirus.log")
 MAX_WORKERS = max(2, multiprocessing.cpu_count() - 1)
 
-# Whitelisted SHA256 hashes (example, replace with real hashes)
+# Whitelisted SHA256 hashes
 WHITELISTED_HASHES = [
     "ca8c0a2a00f1d6f6da076d1d61fa706e82df57ed2b12ae3b3c36f4f73556b2ec",
     "fdb20300b1d03f27a9ae9e82f9f4c49d58efd558aeecb44aa8927964663b2d06",
@@ -138,6 +138,8 @@ WHITELISTED_HASHES = [
     "3fedf64d8e2fe8084fbf8d1eb5c1f93de75f321070f6cecfeaa7d8b4d79c16c7",
     "5e97e7d15609fe298f87a8891e5f8ecc2bfd4e196531349a0b7145fab3dd9684",
     "522a918a423f6167e4f0a93b3b6dc06b43b53b6ce424a5345bdf56472b30eb31",
+    "a7bd56874f1aee9d42805667581c48a7184c932428fca420742b306307d6e5c4",
+    "2d910cd17814c4718f7c6fd099232a70e8d38469efe6ccc414c6e956fd1c36fa",
 ]
 # ================================================
 
@@ -2120,4 +2122,5 @@ rule Detect_Self_Modifying_Code_Improved
             logger.error(f"Error calculating SHA256 hash: {file_path} - {e}")
             return None
 # ================================================
+
 
