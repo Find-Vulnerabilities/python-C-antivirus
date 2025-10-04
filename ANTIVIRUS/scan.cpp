@@ -9,6 +9,8 @@
 #include <openssl/sha.h>
 #include <yara.h>
 #include <filesystem>
+#include <iomanip>    // <-- add this for setfill/setw
+#include <chrono>     // <-- add this for chrono
 
 // 全局变量
 YR_RULES* yara_rules = nullptr;
@@ -101,9 +103,9 @@ extern "C" __declspec(dllexport) char* calculate_sha256(const char* file_path) {
 
     // 将哈希转换为十六进制字符串
     std::ostringstream oss;
-    oss << std::hex << std::setfill('0');
+    oss << std::hex << std::setfill('0'); // setfill from <iomanip>
     for (int i = 0; i < SHA256_DIGEST_LENGTH; ++i) {
-        oss << std::setw(2) << static_cast<unsigned int>(hash[i]);
+        oss << std::setw(2) << static_cast<unsigned int>(hash[i]); // setw from <iomanip>
     }
 
     std::string hash_str = oss.str();
@@ -138,7 +140,15 @@ extern "C" __declspec(dllexport) char* scan_process_memory(int pid) {
             std::vector<char> buffer(mem_info.RegionSize);
             SIZE_T bytes_read;
             if (ReadProcessMemory(process_handle, mem_info.BaseAddress, buffer.data(), mem_info.RegionSize, &bytes_read)) {
-                int result = yr_rules_scan_mem(yara_rules, buffer.data(), bytes_read, SCAN_FLAGS_FAST_MODE, scan_callback, &matches, 0);
+                int result = yr_rules_scan_mem(
+                    yara_rules,
+                    reinterpret_cast<const uint8_t*>(buffer.data()), // <-- fix type for YARA
+                    bytes_read,
+                    SCAN_FLAGS_FAST_MODE,
+                    scan_callback,
+                    &matches,
+                    0
+                );
                 // 忽略结果，继续扫描
             }
         }
@@ -267,4 +277,3 @@ extern "C" __declspec(dllexport) int block_process_by_name(const char* process_n
     CloseHandle(hSnapshot);
     return killed_count;
 }
-
