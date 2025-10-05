@@ -1249,12 +1249,247 @@ rule Detect_Self_Modifying_Code_Improved
             return None
 # ================================================
 
+class AntivirusGUI:
+    def __init__(self, engine):
+        self.engine = engine
+        self.root = tk.Tk()
+        self.root.title("Windows Defender - Antivirus")
+        self.root.geometry("900x600")
+        self.root.resizable(False, False)
+        self.root.configure(bg="#f3f6fb")
+        self._setup_style()
+        self._build_interface()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+    def _setup_style(self):
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+        style.configure("TNotebook", background="#f3f6fb", borderwidth=0)
+        style.configure("TNotebook.Tab", background="#e5eaf3", font=("Segoe UI", 11, "bold"), padding=[10, 5])
+        style.map("TNotebook.Tab", background=[("selected", "#0078d7")], foreground=[("selected", "#fff")])
+        style.configure("TButton", font=("Segoe UI", 10), padding=6)
+        style.configure("TLabel", background="#f3f6fb", font=("Segoe UI", 10))
+        style.configure("Treeview", font=("Segoe UI", 10), rowheight=28, background="#fff", fieldbackground="#fff")
+        style.configure("TEntry", font=("Segoe UI", 10))
+
+    def _build_interface(self):
+        notebook = ttk.Notebook(self.root)
+        notebook.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Scan Tab
+        scan_tab = ttk.Frame(notebook)
+        self._build_scan_tab(scan_tab)
+        notebook.add(scan_tab, text="Scan")
+
+        # Quarantine Tab
+        quarantine_tab = ttk.Frame(notebook)
+        self._build_quarantine_tab(quarantine_tab)
+        notebook.add(quarantine_tab, text="Quarantine")
+
+        # Deletion Log Tab
+        log_tab = ttk.Frame(notebook)
+        self._build_log_tab(log_tab)
+        notebook.add(log_tab, text="Deletion Log")
+
+        # Junk Cleaner Tab
+        junk_tab = ttk.Frame(notebook)
+        self._build_junk_tab(junk_tab)
+        notebook.add(junk_tab, text="Junk Cleaner")
+
+    def _build_scan_tab(self, tab):
+        lbl = ttk.Label(tab, text="Scan a file or folder for threats", font=("Segoe UI", 12, "bold"))
+        lbl.pack(pady=10)
+        frame = ttk.Frame(tab)
+        frame.pack(pady=10)
+        self.scan_path_var = tk.StringVar()
+        entry = ttk.Entry(frame, textvariable=self.scan_path_var, width=60)
+        entry.pack(side="left", padx=5)
+        btn_file = ttk.Button(frame, text="Browse File", command=self._browse_file)
+        btn_file.pack(side="left", padx=5)
+        btn_folder = ttk.Button(frame, text="Browse Folder", command=self._browse_folder)
+        btn_folder.pack(side="left", padx=5)
+        btn_scan = ttk.Button(frame, text="Scan", command=self._scan_selected)
+        btn_scan.pack(side="left", padx=5)
+        self.scan_result_text = scrolledtext.ScrolledText(tab, height=15, font=("Segoe UI", 10), bg="#fff")
+        self.scan_result_text.pack(fill="both", expand=True, padx=10, pady=10)
+
+    def _browse_file(self):
+        path = filedialog.askopenfilename(title="Select file to scan")
+        if path:
+            self.scan_path_var.set(path)
+
+    def _browse_folder(self):
+        path = filedialog.askdirectory(title="Select folder to scan")
+        if path:
+            self.scan_path_var.set(path)
+
+    def _scan_selected(self):
+        path = self.scan_path_var.get()
+        self.scan_result_text.delete(1.0, tk.END)
+        if not path:
+            self.scan_result_text.insert(tk.END, "Please select a file or folder.\n")
+            return
+        if os.path.isfile(path):
+            result, score = self.engine.scan_file(path)
+            self.scan_result_text.insert(tk.END, f"File: {path}\nResult: {result}\nRisk Score: {score}\n")
+        elif os.path.isdir(path):
+            self.scan_result_text.insert(tk.END, f"Scanning folder: {path}\n")
+            for root, dirs, files in os.walk(path):
+                for f in files:
+                    fpath = os.path.join(root, f)
+                    result, score = self.engine.scan_file(fpath)
+                    self.scan_result_text.insert(tk.END, f"{fpath}\nResult: {result}\nRisk Score: {score}\n")
+        else:
+            self.scan_result_text.insert(tk.END, "Invalid path.\n")
+
+    def _build_quarantine_tab(self, tab):
+        lbl = ttk.Label(tab, text="Quarantine Area", font=("Segoe UI", 12, "bold"))
+        lbl.pack(pady=10)
+        self.quarantine_tree = ttk.Treeview(tab, columns=("original", "reason", "timestamp"), show="headings")
+        self.quarantine_tree.heading("original", text="Original Path")
+        self.quarantine_tree.heading("reason", text="Reason")
+        self.quarantine_tree.heading("timestamp", text="Timestamp")
+        self.quarantine_tree.pack(fill="both", expand=True, padx=10, pady=10)
+        btn_frame = ttk.Frame(tab)
+        btn_frame.pack(pady=5)
+        btn_restore = ttk.Button(btn_frame, text="Restore", command=self._restore_quarantined)
+        btn_restore.pack(side="left", padx=5)
+        btn_delete = ttk.Button(btn_frame, text="Delete", command=self._delete_quarantined)
+        btn_delete.pack(side="left", padx=5)
+        self._refresh_quarantine()
+
+    def _refresh_quarantine(self):
+        self.quarantine_tree.delete(*self.quarantine_tree.get_children())
+        for record in self.engine.deleted_files:
+            if record.get("quarantined"):
+                self.quarantine_tree.insert("", "end", values=(
+                    record.get("original_path"),
+                    record.get("reason"),
+                    record.get("timestamp"),
+                ))
+
+    def _restore_quarantined(self):
+        selected = self.quarantine_tree.selection()
+        if not selected:
+            messagebox.showinfo("Restore", "Please select a quarantined file to restore.")
+            return
+        item = self.quarantine_tree.item(selected[0])
+        quarantine_path = None
+        for record in self.engine.deleted_files:
+            if record.get("original_path") == item["values"][0] and record.get("quarantined"):
+                quarantine_path = record.get("quarantine_path")
+                break
+        if quarantine_path and self.engine.restore_quarantined_file(quarantine_path):
+            messagebox.showinfo("Restore", "File restored successfully.")
+            self._refresh_quarantine()
+        else:
+            messagebox.showerror("Restore", "Failed to restore file.")
+
+    def _delete_quarantined(self):
+        selected = self.quarantine_tree.selection()
+        if not selected:
+            messagebox.showinfo("Delete", "Please select a quarantined file to delete.")
+            return
+        item = self.quarantine_tree.item(selected[0])
+        quarantine_path = None
+        for record in self.engine.deleted_files:
+            if record.get("original_path") == item["values"][0] and record.get("quarantined"):
+                quarantine_path = record.get("quarantine_path")
+                break
+        if quarantine_path and self.engine.delete_file(quarantine_path, reason="Manual delete from quarantine"):
+            messagebox.showinfo("Delete", "File deleted successfully.")
+            self._refresh_quarantine()
+        else:
+            messagebox.showerror("Delete", "Failed to delete file.")
+
+    def _build_log_tab(self, tab):
+        lbl = ttk.Label(tab, text="Deletion Log", font=("Segoe UI", 12, "bold"))
+        lbl.pack(pady=10)
+        self.log_tree = ttk.Treeview(tab, columns=("original", "reason", "timestamp"), show="headings")
+        self.log_tree.heading("original", text="Original Path")
+        self.log_tree.heading("reason", text="Reason")
+        self.log_tree.heading("timestamp", text="Timestamp")
+        self.log_tree.pack(fill="both", expand=True, padx=10, pady=10)
+        self._refresh_log()
+
+    def _refresh_log(self):
+        self.log_tree.delete(*self.log_tree.get_children())
+        for record in self.engine.deleted_files:
+            if not record.get("quarantined"):
+                self.log_tree.insert("", "end", values=(
+                    record.get("original_path"),
+                    record.get("reason"),
+                    record.get("timestamp"),
+                ))
+
+    def _build_junk_tab(self, tab):
+        lbl = ttk.Label(tab, text="Junk Cleaner", font=("Segoe UI", 12, "bold"))
+        lbl.pack(pady=10)
+        frame = ttk.Frame(tab)
+        frame.pack(pady=10)
+        btn_scan = ttk.Button(frame, text="Scan for Junk", command=self._scan_junk)
+        btn_scan.pack(side="left", padx=5)
+        btn_clean = ttk.Button(frame, text="Clean Junk", command=self._clean_junk)
+        btn_clean.pack(side="left", padx=5)
+        self.junk_result_text = scrolledtext.ScrolledText(tab, height=15, font=("Segoe UI", 10), bg="#fff")
+        self.junk_result_text.pack(fill="both", expand=True, padx=10, pady=10)
+        self.junk_files = []
+
+    def _scan_junk(self):
+        self.junk_result_text.delete(1.0, tk.END)
+        self.junk_files = []
+        # Common junk locations
+        junk_dirs = [
+            os.environ.get("TEMP", ""),
+            os.path.expanduser("~\\AppData\\Local\\Temp"),
+            os.path.expanduser("~\\AppData\\Local\\Microsoft\\Windows\\INetCache"),
+            os.path.expanduser("~\\AppData\\Local\\Microsoft\\Windows\\Temporary Internet Files"),
+            os.path.expanduser("~\\AppData\\Local\\Microsoft\\Windows\\Explorer"),
+            os.path.expanduser("~\\AppData\\Local\\CrashDumps"),
+        ]
+        for d in junk_dirs:
+            if os.path.exists(d):
+                for root, dirs, files in os.walk(d):
+                    for f in files:
+                        fpath = os.path.join(root, f)
+                        self.junk_files.append(fpath)
+        self.junk_result_text.insert(tk.END, f"Found {len(self.junk_files)} junk files.\n")
+        for f in self.junk_files[:100]:
+            self.junk_result_text.insert(tk.END, f"{f}\n")
+        if len(self.junk_files) > 100:
+            self.junk_result_text.insert(tk.END, f"...and {len(self.junk_files) - 100} more.\n")
+
+    def _clean_junk(self):
+        count = 0
+        for f in self.junk_files:
+            try:
+                os.remove(f)
+                count += 1
+            except Exception:
+                pass
+        self.junk_result_text.insert(tk.END, f"\nCleaned {count} junk files.\n")
+
+    def on_close(self):
+        self.engine.save_deletion_list()
+        self.root.destroy()
+
+    def run(self):
+        self.root.mainloop()
+
+# ...existing code...
+
 if __name__ == "__main__":
-    print("AntivirusCore test start")
+    print("AntivirusCore starting...")
     engine = AntivirusEngine()
     print(f"DLL loaded: {engine.dll_loaded}")
     print(f"YARA support: {engine.yara_support}")
-    # Optionally, scan a test file (replace with a real file path)
+    
+    # 测试扫描当前文件
     test_file = os.path.abspath(__file__)
     result, score = engine.scan_file(test_file)
     print(f"Scan result for {test_file}: {result}, risk score: {score}")
+    
+    # 启动GUI界面
+    print("Launching GUI...")
+    gui = AntivirusGUI(engine)
+    gui.run()
